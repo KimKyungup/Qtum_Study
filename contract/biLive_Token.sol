@@ -1,15 +1,15 @@
-pragma solidity ^0.4.21;
+pragma solidity ^0.4.22;
 
 import "./ERC20.sol";   
 import "./SafeMath.sol";
 import "./Owned.sol";
 
-contract biLiveToken is Owned, ERC20 {    
+contract biLiveToken is Owned(), ERC20 {    
     //////////////////////////////////////////////////////////////////////
     /////---------------------------biLive---------------------///////////
     //////////////////////////////////////////////////////////////////////
     uint8 public constant decimals = 8; // it's recommended to set decimals to 8 in QTUM
-    string public constant name = "BiLive Token"; 
+    string public constant name = "BiLive Token 0.1 beta"; 
     string public constant symbol = "BILI"; 
     uint256 public feeDivider = 100; //1%
 
@@ -24,12 +24,17 @@ contract biLiveToken is Owned, ERC20 {
         emit SwapRequest(msg.sender, _value);
     }
 
+    //This function for unexpected situation in Qtum.
+    //If user can transfer Qtum with normal send mode, not contract send mode, the payable function can't not run.
+    //In that case, the operator should withdraw /return.
+    function WithdrawByOwner(uint256 _value) onlyOwner public{
+        owner.transfer(_value);
+    }
 
     event CoinDeposit(address indexed _from, uint256 _value); 
     event SwapRequest(address indexed _from, uint256 _value);    
 
-    // function biLiveToken() public{
-    //     owner = msg.sender
+    // constructor() public{
     // }
 
 
