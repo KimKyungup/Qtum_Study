@@ -36,7 +36,7 @@ const sendQtum = async() =>{
   console.log(result)
   return "done"
 }
-const contractInfo = require("./bin/SmartContract.json")
+const contractInfo = require("../contract/SmartContract.json")
 
 const contract = new Contract(rpc, contractInfo.contracts["biLive_Token"])
 

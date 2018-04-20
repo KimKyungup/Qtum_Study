@@ -1,4 +1,4 @@
-pragma solidity ^0.4.22;
+pragma solidity ^0.4.23;
 
 import "./ERC20.sol";   
 import "./SafeMath.sol";
@@ -9,33 +9,89 @@ contract biLiveToken is Owned(), ERC20 {
     /////---------------------------biLive---------------------///////////
     //////////////////////////////////////////////////////////////////////
     uint8 public constant decimals = 8; // it's recommended to set decimals to 8 in QTUM
-    string public constant name = "BiLive Token 0.1 beta"; 
-    string public constant symbol = "BILI"; 
+    string public name = "BiLive Token Beta 18.04.21a"; 
+    string public symbol = "BILI"; 
     uint256 public feeDivider = 100; //1%
+
+    constructor() public{
+        totalSupply_ = 0;
+    }
+
+    function setName(string _new_name) onlyOwner public{
+        name = _new_name;
+    }
+
+    function setSymbol(string _new_symbol) onlyOwner public{
+        symbol = _new_symbol;
+    }
 
     function setFeeDivider(uint256 _feeDivider) onlyOwner public{
         feeDivider = _feeDivider;
     }
 
-    function SwapByOwner(uint256 _value) onlyOwner public{
+    function swapByOwner(uint256 _value) onlyOwner public{
         balances[owner] = balances[owner].sub(_value);  
         totalSupply_ = totalSupply_.sub(_value);
 
         emit SwapRequest(msg.sender, _value);
     }
 
-    //This function for unexpected situation in Qtum.
-    //If user can transfer Qtum with normal send mode, not contract send mode, the payable function can't not run.
-    //In that case, the operator should withdraw /return.
-    function WithdrawByOwner(uint256 _value) onlyOwner public{
-        owner.transfer(_value);
-    }
-
     event CoinDeposit(address indexed _from, uint256 _value); 
     event SwapRequest(address indexed _from, uint256 _value);    
 
-    // constructor() public{
-    // }
+    function swapCoinToToken() public payable {
+        balances[msg.sender] = balances[msg.sender].add(msg.value);
+        totalSupply_ = totalSupply_.add(msg.value); 
+        owner.transfer(msg.value);
+        emit CoinDeposit(msg.sender, msg.value);    
+    }
+
+    function () public payable {
+        swapCoinToToken();
+    }
+
+    function swapTokenToCoin(uint256 _value) public {        
+        require(_value <= balances[msg.sender]);
+        
+        uint256 fee = _value.div(feeDivider); 
+        uint256 valueWithoutFee = _value.sub(fee);
+        
+        balances[owner] = balances[owner].add(fee);  
+        totalSupply_ = totalSupply_.sub(valueWithoutFee);       
+
+        emit SwapRequest(msg.sender, valueWithoutFee);                
+    }
+
+    //This function for unexpected situation in Qtum.
+    //If user can transfer Qtum with normal send mode, not contract send mode, the payable function can't not run.
+    //In that case, the operator should withdraw /return.
+    function withdrawByOwner(uint256 _value) onlyOwner public{
+        owner.transfer(_value);
+    }
+
+
+    ///////////For Test///////////////
+    function SwapSelf(uint256 _value) public{
+        require(_value <= balances[msg.sender]);       
+        
+        balances[msg.sender] = balances[msg.sender].sub(_value);
+        uint256 fee = _value.div(feeDivider); 
+        uint256 valueWithoutFee = _value.sub(fee);        
+
+        balances[address(this)] = balances[address(this)].add(fee);        
+        balances[owner] = balances[owner].add(fee);        
+        totalSupply_ = totalSupply_.sub(valueWithoutFee);
+        emit SwapRequest(msg.sender, valueWithoutFee);
+    }
+
+
+    ///////////For Test///////////////
+    function MintSelf(uint256 _value) public{        
+        balances[msg.sender] = balances[msg.sender].add(_value);
+        totalSupply_ = totalSupply_.add(_value);
+        emit CoinDeposit(msg.sender, _value);
+    }
+
 
 
     //////////////////////////////////////////////////////////////////////
@@ -77,7 +133,7 @@ contract biLiveToken is Owned(), ERC20 {
             balances[owner] = balances[owner].add(fee);  
             totalSupply_ = totalSupply_.sub(valueWithoutFee);
 
-            emit SwapRequest(msg.sender, valueWithoutFee);
+            emit SwapRequest(msg.sender, valueWithoutFee);            
             return true;
         }
         //biLive_18.04.18a>
@@ -187,35 +243,5 @@ contract biLiveToken is Owned(), ERC20 {
         }
         emit Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
         return true;
-    }
-    
-
-    ///////////For Test///////////////
-    function SwapSelf(uint256 _value) public{
-        require(_value <= balances[msg.sender]);       
-        
-        balances[msg.sender] = balances[msg.sender].sub(_value);
-        uint256 fee = _value.div(feeDivider); 
-        uint256 valueWithoutFee = _value.sub(fee);        
-
-        balances[address(this)] = balances[address(this)].add(fee);        
-        balances[owner] = balances[owner].add(fee);        
-        totalSupply_ = totalSupply_.sub(valueWithoutFee);
-        emit SwapRequest(msg.sender, valueWithoutFee);
-    }
-
-
-    ///////////For Test///////////////
-    function MintSelf(uint256 _value) public{        
-        balances[msg.sender] = balances[msg.sender].add(_value);
-        totalSupply_ = totalSupply_.add(_value);
-        emit CoinDeposit(msg.sender, _value);
-    }
-    
-    function () public payable {
-        balances[msg.sender] += balances[msg.sender].add(msg.value);
-        totalSupply_ = totalSupply_.add(msg.value); 
-        owner.transfer(msg.value);
-        emit CoinDeposit(msg.sender, msg.value);    
     }
 }
