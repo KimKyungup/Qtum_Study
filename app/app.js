@@ -30,9 +30,9 @@ const walletLock = async()=>{
 }
 
 
-const sendQtum = async() =>{
+const sendQtum = async(toAddr, amount) =>{
   //result = await rpc.rawCall("sendtoaddress",["qUVsNzAi6WkLJCVT72rjxCNLa2iKS5Q81N", 1000, "test", "test outpost", false, "qZSPRLq9AWkw4uzPJ94TsMPPPnPcfv9WH8", true])
-  result = await rpc.rawCall("sendtoaddress",["qadoLqUojq55YwhNAf6mAyDaSeneNKfq8s", 100])
+  result = await rpc.rawCall("sendtoaddress",[toAddr, amount])
   console.log(result)
   return "done"
 }
@@ -51,8 +51,27 @@ async function getLogs(fromBlock=0, toBlock="latest") {
     toBlock,
     minconf: 1,
   })
- 
   console.log(JSON.stringify(logs, null, 2))
+
+  for(var i = 0, len = logs.entries.length; i < len;i++){
+    var entry = logs.entries[i]
+
+    if(entry.event.type == "SwapRequest"){
+      console.log("#########SwapRequest#######")
+      console.log(entry)
+      var amount =  entry["event"]["_value"]
+      var toAddrHex = entry["event"]["_from"]
+      var toAddr = await rpc.rawCall("fromhexaddress",[toAddrHex]) 
+ 
+      console.log("amount :" + amount)
+      console.log(amount/100000000)
+      console.log("toAddr :" + toAddr)
+
+      // walletUnLock()
+      // sendQtum(toAddr,amount/100000000) 
+      // walletLock()
+    }
+  }
 }
  
 getLogs()
@@ -65,16 +84,58 @@ contract.onLog((entry) => {
 
 this.emitter = contract.logEmitter({ minconf: 1 })
 
-this.emitter.on("SwapRequest", (event) => {
+async function Withdraw(toAddrHex, amountBI){
+
+  var qtumAmount = amountBI / 100000000
+  var toAddr = await rpc.rawCall("fromhexaddress",[toAddrHex])
+
   console.log("#########SwapRequest#######")
+
+  console.log("amount :" + qtumAmount)
+  console.log("tp :" + toAddr)
+
+  walletUnLock()
+  sendQtum(toAddr,qtumAmount)  
+  walletLock()  
+  console.log("##############################")
+}
+
+this.emitter.on("SwapRequest", (event) => {
+  
   console.log(event)
+  var amount =  event["event"]["_value"]
+  var toAddrHex = event["event"]["_from"]
+
+  Withdraw(toAddrHex, amount)  
 })
+
+async function getUTXO(hexAddr){
+  var UTXO = await rpc.rawCall("fromhexaddress",[hexAddr])
+  return UTXO
+}
 
 this.emitter.on("CoinDeposit", (event) => {
+
+  var amount =  event["event"]["_value"]
+  var qtumAmount = amount / 100000000
+  var fromAddrHex = event["event"]["_from"]
+  var fromAddr = getUTXO(fromAddrHex)
+
+  // var fromAddr = rpc.rawCall("fromhexaddress",[fromAddrHex])  //await fromHexAddress(fromAddrHex)
+
   console.log("##########CoinDeposit##########")
-  console.log(event)
+  console.log("from : " + fromAddr)
+  console.log("amount : " + qtumAmount)  
+  console.log("##############################")
+  //console.log(JSON.stringify(event, null, 2))
 })
 
+//console.log(fromHexAddress("b790776b5e4cd2efadd538ddfe61324354961540"))
+
+
+// "_value": "5f5e100",
+// "_from": "b790776b5e4cd2efadd538ddfe61324354961540",
+// "type": "CoinDeposit"
 
 //getBlockCount()
 //walletLock()

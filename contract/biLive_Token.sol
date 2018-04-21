@@ -9,9 +9,9 @@ contract biLiveToken is Owned(), ERC20 {
     /////---------------------------biLive---------------------///////////
     //////////////////////////////////////////////////////////////////////
     uint8 public constant decimals = 8; // it's recommended to set decimals to 8 in QTUM
-    string public name = "BiLive Token Beta 18.04.21a"; 
+    string public name = "BiLive Token Beta 18.04.21c"; 
     string public symbol = "BILI"; 
-    uint256 public feeDivider = 100; //1%
+    uint256 public feeDivider = 1000; //0.1%
 
     constructor() public{
         totalSupply_ = 0;
