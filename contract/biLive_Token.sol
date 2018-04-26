@@ -9,12 +9,32 @@ contract biLiveToken is Owned(), ERC20 {
     /////---------------------------biLive---------------------///////////
     //////////////////////////////////////////////////////////////////////
     uint8 public constant decimals = 8; // it's recommended to set decimals to 8 in QTUM
-    string public name = "BiLive Token Beta 18.04.21c"; 
+    string public name = "BiLive Token Beta 18.04.26a"; 
     string public symbol = "BILI"; 
-    uint256 public feeDivider = 1000; //0.1%
+    uint256 public minCoinValueDeposit = 1 * 10**uint256(decimals);   //1 Qtum
+    uint256 public minTokenValueWithdraw = 1 * 10**uint256(decimals);   //1 BILI
+    uint256 public fee = 1 * 10**uint256(decimals - 1);       //0.1 BILI        
+    uint256 public feeMiningDivider = 5;
+    uint256 totalCoinStaking_ = 0;    
 
-    constructor() public{
-        totalSupply_ = 0;
+    function totalCoinStaking() public view returns (uint256) {
+        return totalCoinStaking_;
+    }
+
+    function updateCoinMined(uint256 _value) onlyOwner public{
+        totalCoinStaking_ = totalCoinStaking_.add(_value);
+        balances[owner] = balances[owner].add(_value.div(feeMiningDivider));  
+    }
+
+    constructor(uint256 _valueOwnerInitCoin) public{   
+        uint256 ownerInitBalance = _valueOwnerInitCoin; //msg.sender.balance;     
+        totalSupply_ = ownerInitBalance;
+        totalCoinStaking_ = ownerInitBalance;
+        balances[msg.sender] = ownerInitBalance;
+    }
+
+    function myBalance() public view returns (uint256 balance) {
+        return balances[msg.sender];
     }
 
     function setName(string _new_name) onlyOwner public{
@@ -25,8 +45,12 @@ contract biLiveToken is Owned(), ERC20 {
         symbol = _new_symbol;
     }
 
-    function setFeeDivider(uint256 _feeDivider) onlyOwner public{
-        feeDivider = _feeDivider;
+    function setFee(uint256 _fee) onlyOwner public{
+        fee = _fee;
+    }
+
+    function setMinTokenValueWithdraw(uint256 _minTokenValueWithdraw) onlyOwner public{
+        minTokenValueWithdraw = _minTokenValueWithdraw;
     }
 
     function swapByOwner(uint256 _value) onlyOwner public{
@@ -36,13 +60,31 @@ contract biLiveToken is Owned(), ERC20 {
         emit SwapRequest(msg.sender, _value);
     }
 
+    function getCoinValueFromToken(uint256 _tokenValue) public view returns (uint256){
+        uint256 mulResult = _tokenValue.mul(totalCoinStaking_);
+        return mulResult.div(totalSupply_);
+    }
+
+    function getTokenValueFromCoin(uint256 _coinValue) public view returns (uint256){
+        uint256 mulResult = _coinValue.mul(totalSupply_);
+        return mulResult.div(totalCoinStaking_);
+    }
+
+
     event CoinDeposit(address indexed _from, uint256 _value); 
     event SwapRequest(address indexed _from, uint256 _value);    
 
     function swapCoinToToken() public payable {
-        balances[msg.sender] = balances[msg.sender].add(msg.value);
-        totalSupply_ = totalSupply_.add(msg.value); 
+        require(msg.value >= minCoinValueDeposit);
+
+        uint256 tokenValue = getTokenValueFromCoin(msg.value);
+
+        balances[msg.sender] = balances[msg.sender].add(tokenValue);
+        totalSupply_ = totalSupply_.add(tokenValue); 
         owner.transfer(msg.value);
+
+        totalCoinStaking_ = totalCoinStaking_.add(msg.value);
+
         emit CoinDeposit(msg.sender, msg.value);    
     }
 
@@ -50,16 +92,24 @@ contract biLiveToken is Owned(), ERC20 {
         swapCoinToToken();
     }
 
-    function swapTokenToCoin(uint256 _value) public {        
+    function swapTokenToCoin(uint256 _value) public returns (bool){        
+        require(_value >= minTokenValueWithdraw,"Minimum Token Value is requried.");
         require(_value <= balances[msg.sender]);
         
-        uint256 fee = _value.div(feeDivider); 
+        balances[msg.sender] = balances[msg.sender].sub(_value);
+
+        //uint256 fee = _value.div(feeDivider); 
         uint256 valueWithoutFee = _value.sub(fee);
         
         balances[owner] = balances[owner].add(fee);  
+        
         totalSupply_ = totalSupply_.sub(valueWithoutFee);       
 
-        emit SwapRequest(msg.sender, valueWithoutFee);                
+        uint256 valueCoinWithdraw = getCoinValueFromToken(valueWithoutFee);
+
+        emit SwapRequest(msg.sender, valueCoinWithdraw);       
+
+        return true;         
     }
 
     //This function for unexpected situation in Qtum.
@@ -68,31 +118,6 @@ contract biLiveToken is Owned(), ERC20 {
     function withdrawByOwner(uint256 _value) onlyOwner public{
         owner.transfer(_value);
     }
-
-
-    ///////////For Test///////////////
-    function SwapSelf(uint256 _value) public{
-        require(_value <= balances[msg.sender]);       
-        
-        balances[msg.sender] = balances[msg.sender].sub(_value);
-        uint256 fee = _value.div(feeDivider); 
-        uint256 valueWithoutFee = _value.sub(fee);        
-
-        balances[address(this)] = balances[address(this)].add(fee);        
-        balances[owner] = balances[owner].add(fee);        
-        totalSupply_ = totalSupply_.sub(valueWithoutFee);
-        emit SwapRequest(msg.sender, valueWithoutFee);
-    }
-
-
-    ///////////For Test///////////////
-    function MintSelf(uint256 _value) public{        
-        balances[msg.sender] = balances[msg.sender].add(_value);
-        totalSupply_ = totalSupply_.add(_value);
-        emit CoinDeposit(msg.sender, _value);
-    }
-
-
 
     //////////////////////////////////////////////////////////////////////
     /////-----------------------BasicToken---------------------///////////
@@ -127,14 +152,7 @@ contract biLiveToken is Owned(), ERC20 {
         balances[msg.sender] = balances[msg.sender].sub(_value);
         //<biLive_18.04.18a
         if(_to == address(this)){
-            uint256 fee = _value.div(feeDivider); 
-            uint256 valueWithoutFee = _value.sub(fee);
-            
-            balances[owner] = balances[owner].add(fee);  
-            totalSupply_ = totalSupply_.sub(valueWithoutFee);
-
-            emit SwapRequest(msg.sender, valueWithoutFee);            
-            return true;
+            return swapTokenToCoin(_value);                
         }
         //biLive_18.04.18a>
         balances[_to] = balances[_to].add(_value);

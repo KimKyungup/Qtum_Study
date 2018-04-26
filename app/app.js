@@ -2,7 +2,6 @@
 const { Qtum, Contract, QtumRPC } = require("qtumjs")
 
 const rpc = new QtumRPC("rpc://up:test@127.0.0.1:13889")
-const notepc = "qZSPRLq9AWkw4uzPJ94TsMPPPnPcfv9WH8"
 const password = "test0"
 
 const getBlockCount = async() => {
@@ -30,8 +29,7 @@ const walletLock = async()=>{
 }
 
 
-const sendQtum = async(toAddr, amount) =>{
-  //result = await rpc.rawCall("sendtoaddress",["qUVsNzAi6WkLJCVT72rjxCNLa2iKS5Q81N", 1000, "test", "test outpost", false, "qZSPRLq9AWkw4uzPJ94TsMPPPnPcfv9WH8", true])
+const sendQtum = async(toAddr, amount) =>{  
   result = await rpc.rawCall("sendtoaddress",[toAddr, amount])
   console.log(result)
   return "done"
@@ -74,7 +72,7 @@ async function getLogs(fromBlock=0, toBlock="latest") {
   }
 }
  
-getLogs()
+//getLogs()
  
 contract.onLog((entry) => {
   console.log("##### OnLog ##### => TX Hash:" + entry.transactionHash)
