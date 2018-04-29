@@ -8,39 +8,46 @@ const contractInfo = require("../contract/SmartContract.json")
 const contract = new Contract(rpc, contractInfo.contracts["18.04.28c"])
 
 const getBlockCount = async() => {
-  console.log(await rpc.rawCall("getblockcount"))
-  return "done"
+  return await rpc.rawCall("getblockcount")
 }
 
 const walletUnLockForOnlyStaking = async()=>{
   result = await rpc.rawCall("walletpassphrase",[password, 99999, true])
-  console.log(result)
-  return "done"
+  console.log("Wallet UnLock For Only Staking")
 }
 
 const walletUnLock = async()=>{
   result = await rpc.rawCall("walletpassphrase",[password, 1000, false])
-  console.log(result) 
-  return "done"
+  console.log("Wallet UnLock")   
 }
 
 const walletLock = async()=>{
   result = await rpc.rawCall("walletlock")
-  console.log(result)
-  return "done"
+  console.log("Wallet Lock")
 }
 
 const sendQtum = async(toAddr, amount) =>{  
-  result = await rpc.rawCall("sendtoaddress",[toAddr, amount])
-  console.log(result)
-  return "done"
+  result = await rpc.rawCall("sendtoaddress",[toAddr, amount, "", "" , true])
+  console.log("Send " + amount + "Qtum" + " to ",toAddr)
+  return result.toString()
+}
+
+const withdraw = async(toAddr, amountBI) =>{
+
+  var qtumAmount = amountBI / 100000000
+
+  await walletUnLock()
+  const result = await sendQtum(toAddr,qtumAmount)  
+  await walletUnLockForOnlyStaking() 
+  
+  return result
 }
 
 async function callFunction(){
   const result = await contract.call("totalSupply")
   console.log(result)
 }
- 
+ //////////////////////////////////////////////////////////////////
 async function getLogs(fromBlock=0, toBlock="latest") {
     const logs = await contract.logs({
     fromBlock,
@@ -71,40 +78,38 @@ async function getLogs(fromBlock=0, toBlock="latest") {
 }
  
 //getLogs()
- 
+ //////////////////////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////////////////////
 // contract.onLog((entry) => {
 //   console.log("##### OnLog ##### => TX Hash:" + entry.transactionHash)
 // }, { minconf: 1 })	
-
-//var EventEmitter = require('eventemitter3');
+///////////////////////////////////////////////////////////////////
 
 this.emitter = contract.logEmitter({ minconf: 0 })
 
-async function Withdraw(toAddrHex, amountBI){
-
-  var qtumAmount = amountBI / 100000000
-  var toAddr = await rpc.rawCall("fromhexaddress",[toAddrHex])
+async function SwapTokenToCoin(event){
+  var amount =  event["event"]["_value"]
+  var qtumAmount = amount / 100000000
+  var toAddrHex = event["event"]["_from"]
+  var toAddr = await getBase58Address(toAddrHex)
 
   console.log("#########SwapRequest#########################################")
 
   console.log("amount :" + qtumAmount)
   console.log("to :" + toAddr)
 
-  walletUnLock()
-  sendQtum(toAddr,qtumAmount)  
-  walletUnLockForOnlyStaking() //walletLock()  
-  
-}
+  const result = await withdraw(toAddr, amount)  
 
-this.emitter.on("SwapRequest", (event) => {
-  
-  var amount =  event["event"]["_value"]
-  var toAddrHex = event["event"]["_from"]
-
-  Withdraw(toAddrHex, amount)  
+  console.log("txid : " + result)
 
   console.log(event)
   console.log("#############################################################")
+}
+
+this.emitter.on("SwapRequest", (event) => {  
+  SwapTokenToCoin(event)
 })
 
 async function getBase58Address(hexAddr){
