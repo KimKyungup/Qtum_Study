@@ -4,6 +4,9 @@ const { Qtum, Contract, QtumRPC } = require("qtumjs")
 const rpc = new QtumRPC("rpc://up:test@127.0.0.1:13889")
 const password = "test0"
 
+const contractInfo = require("../contract/SmartContract.json")
+const contract = new Contract(rpc, contractInfo.contracts["18.04.28c"])
+
 const getBlockCount = async() => {
   console.log(await rpc.rawCall("getblockcount"))
   return "done"
@@ -16,11 +19,10 @@ const walletUnLockForOnlyStaking = async()=>{
 }
 
 const walletUnLock = async()=>{
-  result = await rpc.rawCall("walletpassphrase",[password, 100, false])
+  result = await rpc.rawCall("walletpassphrase",[password, 1000, false])
   console.log(result) 
   return "done"
 }
-
 
 const walletLock = async()=>{
   result = await rpc.rawCall("walletlock")
@@ -28,15 +30,11 @@ const walletLock = async()=>{
   return "done"
 }
 
-
 const sendQtum = async(toAddr, amount) =>{  
   result = await rpc.rawCall("sendtoaddress",[toAddr, amount])
   console.log(result)
   return "done"
 }
-const contractInfo = require("../contract/SmartContract.json")
-
-const contract = new Contract(rpc, contractInfo.contracts["biLive_Token"])
 
 async function callFunction(){
   const result = await contract.call("totalSupply")
@@ -74,40 +72,42 @@ async function getLogs(fromBlock=0, toBlock="latest") {
  
 //getLogs()
  
-contract.onLog((entry) => {
-  console.log("##### OnLog ##### => TX Hash:" + entry.transactionHash)
-}, { minconf: 1 })	
+// contract.onLog((entry) => {
+//   console.log("##### OnLog ##### => TX Hash:" + entry.transactionHash)
+// }, { minconf: 1 })	
 
 //var EventEmitter = require('eventemitter3');
 
-this.emitter = contract.logEmitter({ minconf: 1 })
+this.emitter = contract.logEmitter({ minconf: 0 })
 
 async function Withdraw(toAddrHex, amountBI){
 
   var qtumAmount = amountBI / 100000000
   var toAddr = await rpc.rawCall("fromhexaddress",[toAddrHex])
 
-  console.log("#########SwapRequest#######")
+  console.log("#########SwapRequest#########################################")
 
   console.log("amount :" + qtumAmount)
-  console.log("tp :" + toAddr)
+  console.log("to :" + toAddr)
 
   walletUnLock()
   sendQtum(toAddr,qtumAmount)  
-  walletLock()  
-  console.log("##############################")
+  walletUnLockForOnlyStaking() //walletLock()  
+  
 }
 
 this.emitter.on("SwapRequest", (event) => {
   
-  console.log(event)
   var amount =  event["event"]["_value"]
   var toAddrHex = event["event"]["_from"]
 
   Withdraw(toAddrHex, amount)  
+
+  console.log(event)
+  console.log("#############################################################")
 })
 
-async function getUTXO(hexAddr){
+async function getBase58Address(hexAddr){
   var UTXO = await rpc.rawCall("fromhexaddress",[hexAddr])
   return UTXO
 }
@@ -117,15 +117,13 @@ this.emitter.on("CoinDeposit", (event) => {
   var amount =  event["event"]["_value"]
   var qtumAmount = amount / 100000000
   var fromAddrHex = event["event"]["_from"]
-  var fromAddr = getUTXO(fromAddrHex)
+  var fromAddr = getBase58Address(fromAddrHex)  
 
-  // var fromAddr = rpc.rawCall("fromhexaddress",[fromAddrHex])  //await fromHexAddress(fromAddrHex)
-
-  console.log("##########CoinDeposit##########")
+  console.log("##########CoinDeposit##################################")
   console.log("from : " + fromAddr)
-  console.log("amount : " + qtumAmount)  
-  console.log("##############################")
-  //console.log(JSON.stringify(event, null, 2))
+  console.log("amount : " + qtumAmount)    
+  console.log(JSON.stringify(event, null, 2))
+  console.log("#######################################################")
 })
 
 //console.log(fromHexAddress("b790776b5e4cd2efadd538ddfe61324354961540"))
@@ -140,3 +138,82 @@ this.emitter.on("CoinDeposit", (event) => {
 //walletUnLock()
 //sendQtum()
 //walletUnLockForOnlyStaking()
+
+
+
+//////////////////////////////////////////////////////////////////////
+/////---------------------------Call-----------------------///////////
+//////////////////////////////////////////////////////////////////////
+
+async function sc_name(){
+  const result = await contract.call("name");    
+  const name = Buffer(result.executionResult.output, 'hex').toString();
+  console.log("name : ", name);
+}
+
+async function sc_totalSupply(){
+  const result = await contract.call("totalSupply");
+  const totalSupply = result.executionResult.output;
+  console.log("totalSupply : ", parseInt(totalSupply, 16));
+}
+
+async function sc_decimals(){
+  const result = await contract.call("decimals");
+  const decimals = result.executionResult.output;
+  console.log("decimals : ", parseInt(decimals, 16));
+}
+
+async function sc_balanceOf(owner){
+  const result = await contract.call("balanceOf", [owner]);
+  const balance = result.executionResult.output;
+  console.log("balance : ", parseInt(balance, 16));
+}
+
+async function sc_owner(){
+  const result = await contract.call("owner");
+  const owner = result.executionResult.output;
+  console.log("owner : ", owner);
+}
+
+async function sc_feeDivider(){
+  const result = await contract.call("feeDivider");
+  const feeDivider = result.executionResult.output;
+  console.log("feeDivider : ",  parseInt(feeDivider, 16));
+}
+
+async function sc_symbol(){
+  const result = await contract.call("symbol");    
+  const symbol = Buffer(result.executionResult.output, 'hex').toString();
+  console.log("symbol : ",  symbol);
+}
+
+async function sc_newOwner(){
+  const result = await contract.call("newOwner");    
+  const newOwner = Buffer(result.executionResult.output, 'hex').toString();
+  console.log("newOwner : ",  newOwner);
+}
+
+async function sc_allowance(owner, spender){
+  const result = await contract.call("allowance", [owner, spender]);
+  const allowance = result.executionResult.output;
+  console.log("allowance : ",  parseInt(allowance, 16));    
+}
+
+// sc_name()
+// sc_totalSupply()
+// sc_decimals()
+// sc_balanceOf(owner)
+// sc_owner()
+// sc_feeDivider()
+// sc_symbol()
+// sc_newOwner()
+//sc_allowance(owner, owner)
+
+//////////////////////////////////////////////////////////////////////
+/////---------------------------Send-----------------------///////////
+//////////////////////////////////////////////////////////////////////
+
+async function sc_MintSelf(value){    
+  var result = await contract.send("MintSelf", [value]);
+  console.log(result);
+}
